@@ -1,45 +1,65 @@
-"use client"; // ブラウザ側で動作させるために必要
+import { PriceChart } from './components/PriceChart';
 
-import { useEffect, useState } from 'react';
-
-export default function Home() {
-  // 取得したデータを保存するための状態（今はまだ使わない）
-  const [data, setData] = useState(null);
-  // ローディング状態を管理するための状態（今はまだ使わない）
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // APIキーを環境変数から読み込む
-    const apiKey = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY;
-    
-    // Alpha VantageのAPIエンドポイント (例: USD/JPYの日足データ)
-    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=USDJPY&apikey=${apiKey}`;
-
-    const fetchData = async () => {
-      try {
-        const response = await fetch(url);
-        const jsonData = await response.json();
-        
-        // ★重要★ 取得したデータをブラウザのコンソールに出力
-        console.log('APIから取得したデータ:', jsonData);
-        
-        setData(jsonData); // データを状態に保存
-      } catch (error) {
-        console.error('データの取得に失敗しました:', error);
-      } finally {
-        setLoading(false); // ローディング完了
-      }
+// Alpha VantageのAPIから返ってくるデータの型
+interface AlphaVantageData {
+  'Time Series FX (Daily)': {
+    [date: string]: {
+      '1. open': string;
+      '2. high': string;
+      '3. low': string;
+      '4. close': string;
     };
+  };
+}
 
-    fetchData();
-  }, []); // [] 空の配列を指定すると、この処理はページが最初に読み込まれた時に1回だけ実行されます
+// データを取得する非同期関数
+async function getForexData() {
+  const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+  const url = `https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=USD&to_symbol=JPY&apikey=${apiKey}`;
+  
+  const res = await fetch(url, { cache: 'no-store' }); // SSRのためにキャッシュを無効化
+  if (!res.ok) {
+    throw new Error('Failed to fetch data');
+  }
+  const data: AlphaVantageData = await res.json();
+
+  // データ加工
+  const timeSeries = data['Time Series FX (Daily)'];
+  if (!timeSeries) {
+    return []; // データがない場合は空配列を返す
+  }
+
+  // APIのキー(日付)をソートして、チャートライブラリの形式に変換
+  const formattedData = Object.keys(timeSeries)
+    .sort() // 日付順にソート
+    .map((date) => {
+      const dayData = timeSeries[date];
+      return {
+        time: date, // 'YYYY-MM-DD'
+        open: parseFloat(dayData['1. open']),
+        high: parseFloat(dayData['2. high']),
+        low: parseFloat(dayData['3. low']),
+        close: parseFloat(dayData['4. close']),
+      };
+    });
+  
+  return formattedData;
+}
+
+
+// ページ本体 (Server Component)
+export default async function Home() {
+  
+  // サーバーサイドでデータを取得
+  const chartData = await getForexData();
 
   return (
     <main>
-      <h1>為替シミュレーションアプリ</h1>
-      <p>
-        {loading ? 'データを読み込み中です...' : 'データ取得完了（コンソールを確認してください）'}
-      </p>
+      <h1>USD/JPY 為替チャート</h1>
+      
+      {/* 取得したデータをクライアントコンポーネントに渡す */}
+      <PriceChart data={chartData} />
+      
     </main>
   );
 }
