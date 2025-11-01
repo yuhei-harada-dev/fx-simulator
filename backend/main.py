@@ -8,4 +8,4 @@ async def root():
     """
     ルートURL ( / ) へのGETリクエストに応答する
     """
-    return {"message": "Hello World from FastAPI"}
+    return {"message": "Hello Docker"}

@@ -1,0 +1,47 @@
+# Docker Composeのバージョン指定
+version: '3.8'
+
+# 起動するサービス（コンテナ）を定義
+services:
+  
+  # バックエンド (FastAPI) サービス
+  backend:
+    # どのDockerfileを使うかを指定
+    build: ./backend  
+    # コンテナが起動したときに実行されるコマンド (DockerfileのCMDを上書き)
+    # 開発用に --reload オプションを有効にする
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    # ポートのマッピング (ローカルPCの8000番ポートを、コンテナの8000番ポートに繋ぐ)
+    ports:
+      - "8000:8000"
+    # コードの同期
+    # ローカルの ./backend フォルダを、コンテナ内の /app フォルダにマウント
+    # これでローカルの main.py を変更すると、コンテナ内も即座に反映される
+    volumes:
+      - ./backend:/app
+    # 環境変数を .env ファイルから読み込む
+    env_file:
+      - ./.env
+    # dbサービスが起動してから、backendを起動する
+    depends_on:
+      - db
+
+  # データベース (PostgreSQL) サービス
+  db:
+    # 使用する公式イメージを指定 (バージョン15)
+    image: postgres:15
+    # 環境変数を .env ファイルから読み込む (DB名, ユーザー名, パスワード)
+    env_file:
+      - ./.env
+    # ポートのマッピング (ローカルの5432番ポートを、コンテナの5432番ポートに繋ぐ)
+    # (DBeaverなどのDBクライアントソフトから接続する際に使う)
+    ports:
+      - "5432:5432"
+    # データの永続化
+    # postgres_dataという名前のボリュームをコンテナの/var/lib/postgresql/dataにマウント
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+# データの永続化に使うボリューム（保管場所）を定義
+volumes:
+  postgres_data:
