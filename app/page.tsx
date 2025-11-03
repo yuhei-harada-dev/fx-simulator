@@ -1,4 +1,7 @@
+// app/page.tsx
+
 import { PriceChart } from './components/PriceChart';
+import { TradeInterface } from './components/TradeInterface';
 
 // Alpha VantageのAPIから返ってくるデータの型
 interface AlphaVantageData {
@@ -59,6 +62,7 @@ export default async function Home() {
       
       {/* 取得したデータをクライアントコンポーネントに渡す */}
       <PriceChart data={chartData} />
+      <TradeInterface />
       
     </main>
   );
