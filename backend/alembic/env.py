@@ -2,6 +2,7 @@
 import os
 import sys
 from database import Base
+import models
 
 # main.py などと同じ階層(backend/)にあるモジュールを
 # 読み込めるようにパスを追加
@@ -71,6 +72,10 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    # .envから読み込んだ環境変数をAlembicのconfigにセットする
+    db_url = os.environ.get("DATABASE_URL")
+    config.set_main_option("sqlalchemy.url", db_url)
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
