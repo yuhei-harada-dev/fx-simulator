@@ -1,13 +1,14 @@
-//チャートを描画のみを担当するコンポーネント
-// "use client" 宣言
+// app/PriceChart.tsx
+// チャートを描画を担当するコンポーネント
+
 "use client";
 
 import {
-  createChart, //実際にチャートを作る関数
-  ColorType, //色の設定に関する型(たとえば背景色を指定できる)
-  IChartApi, //チャート全体を操作するための型
-  ISeriesApi, //ローソク足を操作するための型
-  CandlestickData, //ローソク足1本分のデータの型
+  createChart,     // 実際にチャートを作る関数
+  ColorType,       // 色の設定に関する型(たとえば背景色を指定できる)
+  IChartApi,       // チャート全体を操作するための型
+  ISeriesApi,      // ローソク足を操作するための型
+  CandlestickData, // ローソク足1本分のデータの型
 } from 'lightweight-charts';
 
 import {
@@ -18,11 +19,11 @@ import {
 // このコンポーネントが外部から受け取るデータ(props)の型を定義
 interface ChartProps {
   data: {
-    time: string; //時間 (例:"2025-10-28")
-    open: number; //始値
-    high: number; //高値
-    low: number;  //安値
-    close: number //終値
+    time: string; // 時間 (例:"2025-10-28")
+    open: number; // 始値
+    high: number; // 高値
+    low: number;  // 安値
+    close: number // 終値
   }[];
 }
 

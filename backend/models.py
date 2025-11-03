@@ -1,7 +1,7 @@
 # backend/models.py
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, func
-from database import Base # アクション1で作成した Base をインポート
+from database import Base
 
 class Transaction(Base):
     # このモデル（クラス）が、'transactions' というテーブル名に対応することを指定
