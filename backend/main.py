@@ -1,6 +1,7 @@
 # backend/main.py
 
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List
@@ -12,6 +13,20 @@ from database import engine, get_db
 
 # FastAPIのインスタンスを作成
 app = FastAPI()
+
+# 許可するオリジン（フロントエンドURL）
+origins = [
+    "http://localhost:3000",
+    # (将来的に本番のフロントエンドURLなどをここに追加予定)
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # すべてのHTTPメソッドを許可
+    allow_headers=["*"], # すべてのHTTPヘッダーを許可
+)
 
 # API エンドポイント
 @app.get("/")
