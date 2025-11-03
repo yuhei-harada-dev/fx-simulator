@@ -1,6 +1,6 @@
 # backend/schemas.py
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 # ベースとなるスキーマ (共通部分)
@@ -18,7 +18,4 @@ class TransactionCreate(TransactionBase):
 class Transaction(TransactionBase):
     id: int
     timestamp: datetime
-
-    # ORMモードを有効にする (DBモデルをPydanticモデルに変換するため)
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

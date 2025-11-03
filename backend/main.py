@@ -1,14 +1,19 @@
-# backend/main.py (修正後)
+# backend/main.py
 
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from typing import List
+
 import models
+import crud
+import schemas
 from database import engine, get_db
 
 # FastAPIのインスタンスを作成
 app = FastAPI()
 
+# API エンドポイント
 @app.get("/")
 async def root(db: Session = Depends(get_db)):
     """
@@ -23,3 +28,28 @@ async def root(db: Session = Depends(get_db)):
     except Exception as e:
         # 接続失敗時
         return {"message": "Hello World. Database connection failed.", "error": str(e)}
+    
+# Create
+@app.post("/transactions/", response_model=schemas.Transaction)
+def create_new_transaction(
+    transaction: schemas.TransactionCreate, 
+    db: Session = Depends(get_db)
+):
+    """
+    新しい取引（POSTリクエスト）を受け取り、DBに保存するAPI
+    """
+    return crud.create_transaction(db=db, transaction=transaction)
+
+
+# Read
+@app.get("/transactions/", response_model=List[schemas.Transaction])
+def read_transactions(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db)
+):
+    """
+    DBから取引履歴のリストを取得するAPI
+    """
+    transactions = crud.get_transactions(db, skip=skip, limit=limit)
+    return transactions
