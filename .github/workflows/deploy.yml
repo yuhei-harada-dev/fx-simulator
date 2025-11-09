@@ -1,0 +1,64 @@
+name: Deploy Backend to AWS ECS
+
+on:
+  # mainブランチにプッシュ（マージ）された時だけ実行
+  push:
+    branches:
+      - main 
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. コードのチェックアウト
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # 2. AWS認証の設定
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    # 3. ECR（Docker保管場所）へのログイン
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    # 4. DockerイメージのビルドとECRへのプッシュ
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }} # コミットIDをタグにする
+      run: |
+        docker build -t $ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG ./backend
+        docker push $ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+        echo "image=$ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    # 5. 現在のECSタスク定義（設計図）をダウンロード
+    - name: Download task definition
+      run: |
+        aws ecs describe-task-definition --task-definition ${{ secrets.ECS_TASK_DEFINITION }} \
+        --query taskDefinition > task-definition.json
+
+    # 6. 設計図のイメージURLを、ステップ4の新しいイメージURLに差し替える
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition.json
+        container-name: backend # タスク定義で指定したコンテナ名
+        image: ${{ steps.build-image.outputs.image }}
+
+    # 7. 差し替えた新しい設計図で、ECSサービスをデプロイ（更新）する
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ secrets.ECS_SERVICE_NAME }}
+        cluster: ${{ secrets.ECS_CLUSTER_NAME }}
+        wait-for-service-stability: true
