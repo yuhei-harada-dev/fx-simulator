@@ -20,7 +20,7 @@ export function TradeInterface() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   // バックエンドAPIのURL
-  const API_URL = "http://fx-simulator-alb-501444866.ap-northeast-1.elb.amazonaws.com/";
+  const API_URL = "/api/proxy";
 
   // 取引履歴を取得する (GET) 関数
   const fetchTransactions = async () => {

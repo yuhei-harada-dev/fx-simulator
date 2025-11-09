@@ -18,7 +18,7 @@ app = FastAPI()
 origins = [
     "http://localhost:3000",
     "https://fx-simulator.vercel.app/",
-    # (将来的に本番のフロントエンドURLなどをここに追加予定)
+    "*" # Vercel Proxyからのアクセスのために追加
 ]
 
 app.add_middleware(
