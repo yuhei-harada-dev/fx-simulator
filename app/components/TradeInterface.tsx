@@ -25,7 +25,7 @@ export function TradeInterface() {
   // 取引履歴を取得する (GET) 関数
   const fetchTransactions = async () => {
     try {
-      const res = await fetch(`${API_URL}/transactions`);
+      const res = await fetch(`${API_URL}/transactions/`);
       if (!res.ok) throw new Error("Failed to fetch transactions");
       const data: Transaction[] = await res.json();
       setTransactions(data);
@@ -44,7 +44,7 @@ export function TradeInterface() {
         price: 150.00 + Math.random() 
       };
 
-      const res = await fetch(`${API_URL}/transactions`, {
+      const res = await fetch(`${API_URL}/transactions/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
