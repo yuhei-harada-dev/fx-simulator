@@ -17,6 +17,7 @@ app = FastAPI()
 # 許可するオリジン（フロントエンドURL）
 origins = [
     "http://localhost:3000",
+    "https://fx-simulator.vercel.app/",
     # (将来的に本番のフロントエンドURLなどをここに追加予定)
 ]
 
