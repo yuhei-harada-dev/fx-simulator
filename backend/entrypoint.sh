@@ -1,5 +1,4 @@
-# backend/entrypoint.sh
-# コンテナが起動したときにAlembicを実行後、FastAPIを実行する起動スクリプト
+#!/bin/sh
 
 # データベースのマイグレーション (テーブル作成)
 alembic upgrade head
