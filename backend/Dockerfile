@@ -17,8 +17,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # backendフォルダの中身（main.pyなど）をコンテナの /app にコピー
 COPY . .
 
+# entrypoint.sh に実行権限を与える
+RUN chmod +x ./entrypoint.sh
+
+# コンテナ起動時に実行するコマンドをCMDからENTRYPOINTに変更
+ENTRYPOINT ["./entrypoint.sh"]
+
 # コンテナ起動時に実行するコマンド
 # uvicorn を本番モードで起動
 # --host 0.0.0.0 でコンテナ外部からのアクセスを許可
 # --port 8000 で8000番ポートで待機
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
