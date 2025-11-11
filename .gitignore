@@ -47,3 +47,5 @@ __pycache__/
 # Virtual Environment
 .venv/
 venv/
+
+memo.txt
