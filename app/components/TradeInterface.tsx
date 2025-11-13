@@ -4,6 +4,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { PriceChart } from './PriceChart';
 
 // APIから返ってくる取引履歴の「型」
 interface Transaction {
@@ -15,22 +16,49 @@ interface Transaction {
   timestamp: string; 
 }
 
+// チャートデータの「型」
+interface ChartData {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
 export function TradeInterface() {
   // 取引履歴のリストを保持する状態
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
+  // チャートデータを保持する状態
+  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [isLoading, setIsLoading] = useState(true); // ローディング状態
+
   // バックエンドAPIのURL
   const API_URL = "/api/proxy";
 
-  // 取引履歴を取得する (GET) 関数
-  const fetchTransactions = async () => {
+  // データをまとめて取得する関数
+  const fetchData = async () => {
+    setIsLoading(true);
     try {
-      const res = await fetch(`${API_URL}/transactions`);
-      if (!res.ok) throw new Error("Failed to fetch transactions");
-      const data: Transaction[] = await res.json();
-      setTransactions(data);
+      // 両方のAPIを並行して呼び出す
+      const [chartRes, txRes] = await Promise.all([
+        fetch(`${API_URL}/daily-chart`), // ステップ2で新設したエンドポイント
+        fetch(`${API_URL}/transactions`)
+      ]);
+
+      if (!chartRes.ok) throw new Error("Failed to fetch chart data");
+      if (!txRes.ok) throw new Error("Failed to fetch transactions");
+
+      const chartData: ChartData[] = await chartRes.json();
+      const txData: Transaction[] = await txRes.json();
+
+      setChartData(chartData);
+      setTransactions(txData);
+
     } catch (error) {
       console.error(error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -55,7 +83,7 @@ export function TradeInterface() {
       if (!res.ok) throw new Error("Failed to create transaction");
 
       // POSTが成功したら、リストを再取得して画面を更新
-      fetchTransactions(); 
+      fetchData(); 
     } catch (error) {
       console.error(error);
     }
@@ -63,11 +91,19 @@ export function TradeInterface() {
 
   // ページ読み込み時に取引履歴を1回だけ取得
   useEffect(() => {
-    fetchTransactions();
+    fetchData();
   }, []); // 空の配列は「マウント時に1回だけ実行」を意味
 
   return (
     <div>
+
+      {/* データがある場合のみチャートを表示 */}
+      {isLoading ? (
+        <p>チャート読込中</p>
+      ) : (
+        <PriceChart data={chartData} />
+      )}
+
       <hr />
       <h2>API 接続テスト</h2>
       <button onClick={handleCreateTransaction}>
