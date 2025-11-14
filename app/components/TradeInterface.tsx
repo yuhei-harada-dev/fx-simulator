@@ -36,25 +36,14 @@ export function TradeInterface() {
   // バックエンドAPIのURL
   const API_URL = "/api/proxy";
 
-  // データをまとめて取得する関数
-  const fetchData = async () => {
+  // チャートデータを取得する関数
+  const fetchChartData = async () => {
     setIsLoading(true);
     try {
-      // 両方のAPIを並行して呼び出す
-      const [chartRes, txRes] = await Promise.all([
-        fetch(`${API_URL}/daily-chart`), // ステップ2で新設したエンドポイント
-        fetch(`${API_URL}/transactions`)
-      ]);
-
+      const chartRes = await fetch(`${API_URL}/daily-chart`);
       if (!chartRes.ok) throw new Error("Failed to fetch chart data");
-      if (!txRes.ok) throw new Error("Failed to fetch transactions");
-
-      const chartData: ChartData[] = await chartRes.json();
-      const txData: Transaction[] = await txRes.json();
-
-      setChartData(chartData);
-      setTransactions(txData);
-
+      const data: ChartData[] = await chartRes.json();
+      setChartData(data);
     } catch (error) {
       console.error(error);
     } finally {
@@ -62,13 +51,25 @@ export function TradeInterface() {
     }
   };
 
-  // ダミー取引を作成する (POST) 関数
+  // 取引履歴を取得する関数
+  const fetchTransactions = async () => {
+    try {
+      const txRes = await fetch(`${API_URL}/transactions`);
+      if (!txRes.ok) throw new Error("Failed to fetch transactions");
+      const txData: Transaction[] = await txRes.json();
+      setTransactions(txData);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // ダミー取引を作成する関数 (POST)
   const handleCreateTransaction = async () => {
     try {
       const newTransactionData = {
         pair: "USD/JPY",
         trade_type: "buy",
-        amount: 1000,
+        amount: 10000,
         price: 150.00 + Math.random() 
       };
 
@@ -82,17 +83,18 @@ export function TradeInterface() {
 
       if (!res.ok) throw new Error("Failed to create transaction");
 
-      // POSTが成功したら、リストを再取得して画面を更新
-      fetchData(); 
+      fetchTransactions();
+
     } catch (error) {
       console.error(error);
     }
   };
 
-  // ページ読み込み時に取引履歴を1回だけ取得
+  // ページ読み込み時にチャートデータと取引履歴を取得
   useEffect(() => {
-    fetchData();
-  }, []); // 空の配列は「マウント時に1回だけ実行」を意味
+    fetchChartData();
+    fetchTransactions();
+  }, []); // 空の配列は1回だけ実行を意味する
 
   return (
     <div>
