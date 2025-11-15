@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+from typing import Optional
 
 # ベースとなるスキーマ (共通部分)
 class TransactionBase(BaseModel):
@@ -9,6 +10,8 @@ class TransactionBase(BaseModel):
     trade_type: str  # "buy" or "sell"
     amount: float
     price: float
+    profit: Optional[float] = None
+    opening_trade_id: Optional[int] = None
 
 # データ作成時に使用するスキーマ (リクエスト用)
 class TransactionCreate(TransactionBase):

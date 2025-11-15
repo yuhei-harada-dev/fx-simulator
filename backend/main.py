@@ -59,7 +59,7 @@ async def get_daily_chart_data():
     if not API_KEY:
         raise HTTPException(status_code=500, detail="API key is not configured")
 
-    url = f"https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=USD&to_symbol=JPY&apikey={API_KEY}"
+    url = f"https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=USD&to_symbol=JPY&outputsize=full&apikey={API_KEY}"
     
     # httpxを使って非同期でAPIリクエスト
     async with httpx.AsyncClient() as client:

@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PriceChart } from './PriceChart';
 
 // APIから返ってくる取引履歴の「型」
@@ -29,8 +29,15 @@ export function TradeInterface() {
   // 取引履歴のリストを保持する状態
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
+  // シミュレーション用
+  const [fullChartData, setFullChartData] = useState<ChartData[]>([]); // 全データ
+  const [displayChartData, setDisplayChartData] = useState<ChartData[]>([]); // 描画用データ
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [currentDateIndex, setCurrentDateIndex] = useState(0); // 現在のデータインデックス
+  const simulationInterval = useRef<NodeJS.Timeout | null>(null); // Interval ID
+
   // チャートデータを保持する状態
-  const [chartData, setChartData] = useState<ChartData[]>([]);
+  // const [chartData, setChartData] = useState<ChartData[]>([]);
   const [isLoading, setIsLoading] = useState(true); // ローディング状態
 
   // バックエンドAPIのURL
@@ -43,7 +50,12 @@ export function TradeInterface() {
       const chartRes = await fetch(`${API_URL}/daily-chart`);
       if (!chartRes.ok) throw new Error("Failed to fetch chart data");
       const data: ChartData[] = await chartRes.json();
-      setChartData(data);
+
+      setFullChartData(data); // 全データをここに保持
+      const initialData = data.slice(0, 4000); // 最初は例えば4000日分だけ表示する
+      setDisplayChartData(initialData);
+      setCurrentDateIndex(4000); // 次は4000番目から開始
+
     } catch (error) {
       console.error(error);
     } finally {
@@ -90,6 +102,40 @@ export function TradeInterface() {
     }
   };
 
+// シミュレーション開始/停止ロジック
+  const startSimulation = () => {
+    if (isSimulating || currentDateIndex >= fullChartData.length) return;
+
+    setIsSimulating(true);
+
+    simulationInterval.current = setInterval(() => {
+      setCurrentDateIndex((prevIndex) => {
+        const nextIndex = prevIndex + 1;
+        if (nextIndex >= fullChartData.length) {
+          stopSimulation(); // データが終わったら停止
+          return prevIndex;
+        }
+
+        // 描画用データに次の1日分を追加
+        setDisplayChartData(fullChartData.slice(0, nextIndex));
+        return nextIndex;
+      });
+    }, 200); // 0.2秒ごとに更新
+  };
+
+  const stopSimulation = () => {
+    setIsSimulating(false);
+    if (simulationInterval.current) {
+      clearInterval(simulationInterval.current);
+      simulationInterval.current = null;
+    }
+  };
+
+  // 停止ボタンが押されたときや、コンポーネントが消えるときのための処理
+  useEffect(() => {
+    return () => stopSimulation(); // クリーンアップ
+  }, []);
+
   // ページ読み込み時にチャートデータと取引履歴を取得
   useEffect(() => {
     fetchChartData();
@@ -99,11 +145,21 @@ export function TradeInterface() {
   return (
     <div>
 
-      {/* データがある場合のみチャートを表示 */}
+      {/* チャートと操作ボタン */}
       {isLoading ? (
         <p>チャート読込中</p>
       ) : (
-        <PriceChart data={chartData} />
+        <>
+          <PriceChart data={displayChartData} />
+          <div>
+            <button onClick={startSimulation} disabled={isSimulating}>
+              シミュレーション開始
+            </button>
+            <button onClick={stopSimulation} disabled={!isSimulating}>
+              停止
+            </button>
+          </div>
+        </>
       )}
 
       <hr />
