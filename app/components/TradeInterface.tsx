@@ -3,8 +3,9 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { PriceChart } from './PriceChart';
+// useCallback を React からインポート
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { PriceChart } from '@/app/components/PriceChart';
 
 // APIから返ってくる取引履歴の型
 interface Transaction {
@@ -29,11 +30,14 @@ interface ChartData {
 
 // ポジションの型
 interface Position {
-  trade_type: 'BID' | 'ASK';
+  trade_type: 'BID' | 'ASK'; // 'sell' | 'buy'
   amount: number;
   price: number;
   id: number; //決済時に使う元の取引ID
 }
+
+// 口座残高の初期値
+const INITIAL_ACCOUNT_BALANCE = 1000000;
 
 export function TradeInterface() {
   // 取引履歴のリストを保持する状態
@@ -48,11 +52,11 @@ export function TradeInterface() {
 
   const [isLoading, setIsLoading] = useState(true); // ローディング状態
 
-  // 現在のレート・ポジション・損益　を管理する
+  // 現在のレート・ポジション・損益・口座残高 を管理する
   const [currentRate, setCurrentRate] = useState<number>(0);
   const [position, setPosition] = useState<Position | null>(null);
-  //const [position, setPosition] = useState<Position | null>({ trade_type: 'buy', amount: 10000, price: 150.00, id: 1 }) //テスト用ダミーデータ
   const [profitOrLoss, setProfitOrLoss] = useState<number>(0);
+  const [accountBalance, setAccountBalance] = useState<number>(INITIAL_ACCOUNT_BALANCE); // 口座残高
 
 
   // バックエンドAPIのURL
@@ -67,9 +71,12 @@ export function TradeInterface() {
       const data: ChartData[] = await chartRes.json();
 
       setFullChartData(data); // 全データをここに保持
-      const initialData = data.slice(0, 4000); // 最初は例えば4000日分だけ表示する
+      
+      // 注意: 4000件より少ないとシミュレーションが開始しない
+      const initialDayCount = 4000; 
+      const initialData = data.slice(0, initialDayCount);
       setDisplayChartData(initialData);
-      setCurrentDateIndex(4000); // 次は4000番目から開始
+      setCurrentDateIndex(initialDayCount); 
 
       // 最新のレート（チャートの最後の終値）をセット
       if (initialData.length > 0) {
@@ -89,95 +96,22 @@ export function TradeInterface() {
       const txRes = await fetch(`${API_URL}/transactions`);
       if (!txRes.ok) throw new Error("Failed to fetch transactions");
       const txData: Transaction[] = await txRes.json();
-      setTransactions(txData);
+      setTransactions(txData); // バックエンドでソート済み
     } catch (error) {
       console.error(error);
     }
   };
 
-  // ダミー取引を作成する関数 (POST)
-  const handleCreateTransaction = async () => {
-    try {
-      const newTransactionData = {
-        pair: "USD/JPY",
-        trade_type: "buy",
-        amount: 10000,
-        price: 150.00 + Math.random() 
-      };
 
-      const res = await fetch(`${API_URL}/transactions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newTransactionData),
-      });
-
-      if (!res.ok) throw new Error("Failed to create transaction");
-
-      fetchTransactions();
-
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  // BUYボタンが押された時の処理
+  // ASK(買)ボタンが押された時の処理
   const handleBuy = async () => {
-    // シミュレーション中でない、または既にポジションがある場合は何もしない
     if (!isSimulating || position) return; 
 
-    const tradeAmount = 10000; // 1万通貨
+    const tradeAmount = 10000; 
 
     const newTransactionData = {
       pair: "USD/JPY",
-      trade_type: "buy",
-      amount: tradeAmount,
-      price: currentRate, // 現在のレートで約定
-      profit: null,
-      opening_trade_id: null
-    };
-
-    try {
-      const res = await fetch(`${API_URL}/transactions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newTransactionData),
-      });
-
-      if (!res.ok) throw new Error("Failed to create transaction");
-
-      // DBに保存成功したら、レスポンスからDB上のデータを取得
-      const savedTx: Transaction = await res.json();
-
-      // フロントエンドのPosition Stateを更新
-      setPosition({
-        trade_type: 'ASK',
-        amount: savedTx.amount,
-        price: savedTx.price,
-        id: savedTx.id // DBのIDを控えておく（決済時に使うため）
-      });
-
-      // 取引履歴リストを更新
-      fetchTransactions();
-
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  // SELLボタンが押された時の処理
-  const handleSell = async () => {
-    // シミュレーション中でない、または既にポジションがある場合は何もしない
-    if (!isSimulating || position) return; 
-
-    const tradeAmount = 10000;
-
-    const newTransactionData = {
-      pair: "USD/JPY",
-      trade_type: "sell",
+      trade_type: "ASK",
       amount: tradeAmount,
       price: currentRate,
       profit: null,
@@ -187,27 +121,56 @@ export function TradeInterface() {
     try {
       const res = await fetch(`${API_URL}/transactions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTransactionData),
       });
-
       if (!res.ok) throw new Error("Failed to create transaction");
+      const savedTx: Transaction = await res.json();
+      
+      setPosition({
+        trade_type: 'ASK',
+        amount: savedTx.amount,
+        price: savedTx.price,
+        id: savedTx.id 
+      });
+      
+      fetchTransactions();
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
+  // BID(売)ボタンが押された時の処理
+  const handleSell = async () => {
+    if (!isSimulating || position) return; 
+
+    const tradeAmount = 10000;
+    const newTransactionData = {
+      pair: "USD/JPY",
+      trade_type: "BID",
+      amount: tradeAmount,
+      price: currentRate,
+      profit: null,
+      opening_trade_id: null
+    };
+
+    try {
+      const res = await fetch(`${API_URL}/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTransactionData),
+      });
+      if (!res.ok) throw new Error("Failed to create transaction");
       const savedTx: Transaction = await res.json();
 
-      // フロントエンドのPosition Stateを更新
       setPosition({
         trade_type: 'BID',
         amount: savedTx.amount,
         price: savedTx.price,
         id: savedTx.id 
       });
-
-      // 取引履歴リストを更新
+      
       fetchTransactions();
-
     } catch (error) {
       console.error(error);
     }
@@ -215,90 +178,122 @@ export function TradeInterface() {
 
   // 全決済ロジック
   const handleClosePosition = async () => {
-    // シミュレーション中でない、またはポジションが無い場合は何もしない
     if (!isSimulating || !position) return;
 
-    // 決済取引は、保有ポジションと反対の売買タイプになる
     const closingTradeType = position.trade_type === 'ASK' ? 'BID' : 'ASK';
 
     const newTransactionData = {
       pair: "USD/JPY",
       trade_type: closingTradeType,
       amount: position.amount,
-      price: currentRate, // 現在のレートで決済
-      profit: profitOrLoss, // リアルタイム計算されていた損益を確定
-      opening_trade_id: position.id // どの取引を決済したかIDで紐付ける
+      price: currentRate, 
+      profit: profitOrLoss, // 確定損益
+      opening_trade_id: position.id 
     };
 
     try {
       const res = await fetch(`${API_URL}/transactions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTransactionData),
       });
-
       if (!res.ok) throw new Error("Failed to close transaction");
 
-      // DBに決済取引を保存できたら、フロントエンドの状態をリセット
+      // 口座残高に損益を反映
+      setAccountBalance(prevBalance => prevBalance + profitOrLoss);
+      // フロントエンドの状態をリセット
       setPosition(null);
-      // setProfitOrLoss(0); // positionがnullになればuseEffectで自動的に0になる
-
-      // 取引履歴リストを更新
+      
       fetchTransactions();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+  
+  // 取引履歴リセットロジック
+  const handleResetHistory = async () => {
+    // 念のためシミュレーションを停止
+    stopSimulation();
+    
+    try {
+      const res = await fetch(`${API_URL}/transactions`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error("Failed to reset transactions");
+
+      // フロントエンドの状態もすべてリセット
+      setTransactions([]);
+      setPosition(null);
+      setProfitOrLoss(0);
+      setAccountBalance(INITIAL_ACCOUNT_BALANCE);
+      
+      // チャートデータを初期状態に戻す (4000件)
+      const initialData = fullChartData.slice(0, 4000);
+      setDisplayChartData(initialData);
+      setCurrentDateIndex(4000);
+      if (initialData.length > 0) {
+        setCurrentRate(initialData[initialData.length - 1].close);
+      }
 
     } catch (error) {
       console.error(error);
     }
   };
 
-  // シミュレーション開始/停止ロジック
-  const startSimulation = () => {
+  // シミュレーション停止ロジック (useCallbackで囲む)
+  const stopSimulation = useCallback(() => {
+    setIsSimulating(false);
+    if (simulationInterval.current) {
+      clearInterval(simulationInterval.current);
+      simulationInterval.current = null;
+    }
+  }, []); // 依存配列は空
+  
+  // シミュレーション開始ロジック (useCallbackで囲む)
+  const startSimulation = useCallback(() => {
     if (isSimulating || currentDateIndex >= fullChartData.length) return;
 
     setIsSimulating(true);
 
     simulationInterval.current = setInterval(() => {
       setCurrentDateIndex((prevIndex) => {
-
         const nextIndex = prevIndex + 1;
         if (nextIndex >= fullChartData.length) {
           stopSimulation(); // データが終わったら停止
           return prevIndex;
         }
 
-        // currentRateを1秒ごとに更新する処理
-        const nextDataPoint = fullChartData[prevIndex]; // これから追加するデータ
+        const nextDataPoint = fullChartData[prevIndex]; 
         if (nextDataPoint) {
           setDisplayChartData(fullChartData.slice(0, nextIndex));
           setCurrentRate(nextDataPoint.close); // レートを更新
         }
-
         return nextIndex;
       });
-    }, 1000); // 1秒ごとに更新
-  };
+    }, 1000); // 1秒ごとに更新 (デモ用に早めることも可能)
+  }, [isSimulating, currentDateIndex, fullChartData, stopSimulation]); // 依存配列
 
-  const stopSimulation = () => {
-    setIsSimulating(false);
-    if (simulationInterval.current) {
-      clearInterval(simulationInterval.current);
-      simulationInterval.current = null;
-    }
-  };
-
-  // 停止ボタンが押されたときや、コンポーネントが消えるときのための処理
+  // コンポーネントが消えるときのための処理
   useEffect(() => {
     return () => stopSimulation(); // クリーンアップ
-  }, []);
+  }, [stopSimulation]); // 依存配列に stopSimulation を追加
 
   // ページ読み込み時にチャートデータと取引履歴を取得
   useEffect(() => {
     fetchChartData();
     fetchTransactions();
   }, []); // 空の配列は1回だけ実行を意味する
-
+  
+  // データロード完了後にシミュレーションを自動開始
+  useEffect(() => {
+    // データロード完了(isLoading: false)
+    // fullChartDataにデータ有り
+    // まだシミュレーションが開始していない
+    if (!isLoading && fullChartData.length > 0 && !isSimulating) {
+      startSimulation();
+    }
+  }, [isLoading, fullChartData, isSimulating, startSimulation]);
+  
   // currentRate か position が変更されるたびに、損益を自動計算する
   useEffect(() => {
     if (!position) {
@@ -310,12 +305,12 @@ export function TradeInterface() {
     if (position.trade_type === 'ASK') {
       // (現在のレート - エントリーレート)
       pips = currentRate - position.price;
-    } else {
+    } else { // 'BID'
       // (エントリーレート - 現在のレート)
       pips = position.price - currentRate;
     }
 
-    // 1万通貨の場合 (USD/JPYは 1pips = 100円)
+    // 1万通貨の場合 (USD/JPYは 1pips(0.01円) = 100円)
     const calculatedProfit = pips * position.amount; 
 
     setProfitOrLoss(calculatedProfit);
@@ -331,18 +326,22 @@ export function TradeInterface() {
       ) : (
         <>
           <PriceChart data={displayChartData} />
+          
           <div>
-            {/* <h3>シミュレーション情報</h3> */}
+            <h3>シミュレーション情報</h3>
+            <p>口座残高: {accountBalance.toLocaleString()} 円</p>
             <p>現在のレート: {currentRate.toFixed(3)}</p>
             {position ? (
               <div>
-                <p>取引数量: 1Lot</p>
-                <p>ポジション: {position.trade_type} @ {position.price}</p>
-                <p>損益: {profitOrLoss.toFixed(0)} 円</p>
+                <p>取引数量: 1Lot (10,000通貨)</p>
+                <p>ポジション: {position.trade_type} @ {position.price.toFixed(3)}</p>
+                <p style={{ color: profitOrLoss >= 0 ? 'green' : 'red' }}>
+                  損益: {profitOrLoss.toFixed(0)} 円
+                </p>
               </div>
             ) : (
               <div>
-                <p>取引数量: 1Lot</p>
+                <p>取引数量: 1Lot (10,000通貨)</p>
                 <p>ポジション: なし</p>
                 <p>損益: なし</p>
               </div>
@@ -351,19 +350,19 @@ export function TradeInterface() {
 
           <div>
             <button onClick={startSimulation} disabled={isSimulating}
-            style={{ backgroundColor:  '#ffb300', color: 'black'}}>
+            style={{ backgroundColor:  '#ffb300', color: 'black'}}>
               スタート
             </button>
 
             <button onClick={stopSimulation} disabled={!isSimulating}
-              style={{ backgroundColor:  '#ffb300', color: 'black', marginLeft: '10px'}}
+              style={{ backgroundColor:  '#ffb300', color: 'black', marginLeft: '10px'}}
             >
               ストップ
             </button>
-
+            
             <button 
               onClick={handleSell} 
-              disabled={!isSimulating || !!position} // シミュ中 かつ ポジションが無い 時だけ押せる
+              disabled={!isSimulating || !!position} 
               style={{ backgroundColor: '#ef5350', color: 'white', marginLeft: '10px' }}
             >
               BID(売)
@@ -371,7 +370,7 @@ export function TradeInterface() {
 
             <button 
               onClick={handleClosePosition} 
-              disabled={!isSimulating || !position} // シミュ中 かつ ポジションが有る 時だけ押せる
+              disabled={!isSimulating || !position} 
               style={{ backgroundColor: '#ffb300', color: 'black', marginLeft: '10px' }}
             >
               全決済
@@ -379,7 +378,7 @@ export function TradeInterface() {
             
             <button 
               onClick={handleBuy} 
-              disabled={!isSimulating || !!position} // シミュ中 かつ ポジションが無い 時だけ押せる
+              disabled={!isSimulating || !!position} 
               style={{ backgroundColor: '#26a69a', color: 'white', marginLeft: '10px' }}
             >
               ASK(買)
@@ -389,18 +388,28 @@ export function TradeInterface() {
       )}
 
       <hr />
-      {/* <button onClick={handleCreateTransaction}>ダミー取引作成 (POST)</button> */}
+      
+      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <h3>取引履歴</h3>
+        <button 
+          onClick={handleResetHistory}
+          style={{ backgroundColor: '#888', color: 'white', padding: '2px 8px', fontSize: '12px'}}
+        >
+          履歴リセット
+        </button>
+      </div>
 
-      <h3>取引履歴</h3>
       <ul>
         {transactions.length > 0 ? (
           transactions.map((tx) => (
             <li key={tx.id}>
-              {tx.timestamp}: {tx.trade_type} {tx.pair} @ {tx.price} (ID: {tx.id})
+              {/* 日時を日本時間っぽくフォーマット (簡易版) */}
+              {new Date(tx.timestamp).toLocaleString('ja-JP')}
+              : {tx.trade_type} {tx.pair} @ {tx.price.toFixed(3)} (ID: {tx.id})
 
               {/* 損益表示 */}
               {tx.profit !== null && (
-                <span style={{ color: tx.profit >= 0 ? 'green' : 'red', marginLeft: '10px' }}>
+                <span style={{ color: tx.profit >= 0 ? 'green' : 'red', marginLeft: '10px', fontWeight: 'bold' }}>
                   (損益: {tx.profit.toFixed(0)} 円)
                 </span>
               )}
