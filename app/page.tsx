@@ -59,7 +59,7 @@ export default async function Home() {
 
   return (
     <main>
-      <h1>USD/JPY 為替チャート</h1>
+      <h1>USD/JPY 日足</h1>
       
       {/* 取得したデータをクライアントコンポーネントに渡す */}
       {/* <PriceChart data={chartData} /> */}

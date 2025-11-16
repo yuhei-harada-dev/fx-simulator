@@ -14,6 +14,8 @@ interface Transaction {
   amount: number;
   price: number;
   timestamp: string; 
+  profit: number | null;
+  opening_trade_id: number | null;
 }
 
 // チャートデータの型
@@ -27,7 +29,7 @@ interface ChartData {
 
 // ポジションの型
 interface Position {
-  trade_type: 'buy' | 'sell';
+  trade_type: 'BID' | 'ASK';
   amount: number;
   price: number;
   id: number; //決済時に使う元の取引ID
@@ -152,7 +154,7 @@ export function TradeInterface() {
 
       // フロントエンドのPosition Stateを更新
       setPosition({
-        trade_type: 'buy',
+        trade_type: 'ASK',
         amount: savedTx.amount,
         price: savedTx.price,
         id: savedTx.id // DBのIDを控えておく（決済時に使うため）
@@ -197,7 +199,7 @@ export function TradeInterface() {
 
       // フロントエンドのPosition Stateを更新
       setPosition({
-        trade_type: 'sell',
+        trade_type: 'BID',
         amount: savedTx.amount,
         price: savedTx.price,
         id: savedTx.id 
@@ -211,7 +213,45 @@ export function TradeInterface() {
     }
   };
 
-  ////
+  // 全決済ロジック
+  const handleClosePosition = async () => {
+    // シミュレーション中でない、またはポジションが無い場合は何もしない
+    if (!isSimulating || !position) return;
+
+    // 決済取引は、保有ポジションと反対の売買タイプになる
+    const closingTradeType = position.trade_type === 'ASK' ? 'BID' : 'ASK';
+
+    const newTransactionData = {
+      pair: "USD/JPY",
+      trade_type: closingTradeType,
+      amount: position.amount,
+      price: currentRate, // 現在のレートで決済
+      profit: profitOrLoss, // リアルタイム計算されていた損益を確定
+      opening_trade_id: position.id // どの取引を決済したかIDで紐付ける
+    };
+
+    try {
+      const res = await fetch(`${API_URL}/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTransactionData),
+      });
+
+      if (!res.ok) throw new Error("Failed to close transaction");
+
+      // DBに決済取引を保存できたら、フロントエンドの状態をリセット
+      setPosition(null);
+      // setProfitOrLoss(0); // positionがnullになればuseEffectで自動的に0になる
+
+      // 取引履歴リストを更新
+      fetchTransactions();
+
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   // シミュレーション開始/停止ロジック
   const startSimulation = () => {
@@ -267,7 +307,7 @@ export function TradeInterface() {
     }
 
     let pips = 0;
-    if (position.trade_type === 'buy') {
+    if (position.trade_type === 'ASK') {
       // (現在のレート - エントリーレート)
       pips = currentRate - position.price;
     } else {
@@ -291,26 +331,50 @@ export function TradeInterface() {
       ) : (
         <>
           <PriceChart data={displayChartData} />
-
           <div>
-            <h3>シミュレーション情報</h3>
+            {/* <h3>シミュレーション情報</h3> */}
             <p>現在のレート: {currentRate.toFixed(3)}</p>
             {position ? (
               <div>
+                <p>取引数量: 1Lot</p>
                 <p>ポジション: {position.trade_type} @ {position.price}</p>
                 <p>損益: {profitOrLoss.toFixed(0)} 円</p>
               </div>
             ) : (
-              <p>ポジション: なし</p>
+              <div>
+                <p>取引数量: 1Lot</p>
+                <p>ポジション: なし</p>
+                <p>損益: なし</p>
+              </div>
             )}
           </div>
 
           <div>
-            <button onClick={startSimulation} disabled={isSimulating}>
-              シミュレーション開始
+            <button onClick={startSimulation} disabled={isSimulating}
+            style={{ backgroundColor:  '#ffb300', color: 'black'}}>
+              スタート
             </button>
-            <button onClick={stopSimulation} disabled={!isSimulating}>
-              停止
+
+            <button onClick={stopSimulation} disabled={!isSimulating}
+              style={{ backgroundColor:  '#ffb300', color: 'black', marginLeft: '10px'}}
+            >
+              ストップ
+            </button>
+
+            <button 
+              onClick={handleSell} 
+              disabled={!isSimulating || !!position} // シミュ中 かつ ポジションが無い 時だけ押せる
+              style={{ backgroundColor: '#ef5350', color: 'white', marginLeft: '10px' }}
+            >
+              BID(売)
+            </button>
+
+            <button 
+              onClick={handleClosePosition} 
+              disabled={!isSimulating || !position} // シミュ中 かつ ポジションが有る 時だけ押せる
+              style={{ backgroundColor: '#ffb300', color: 'black', marginLeft: '10px' }}
+            >
+              全決済
             </button>
             
             <button 
@@ -318,32 +382,29 @@ export function TradeInterface() {
               disabled={!isSimulating || !!position} // シミュ中 かつ ポジションが無い 時だけ押せる
               style={{ backgroundColor: '#26a69a', color: 'white', marginLeft: '10px' }}
             >
-              BUY
+              ASK(買)
             </button>
-            <button 
-              onClick={handleSell} 
-              disabled={!isSimulating || !!position} // シミュ中 かつ ポジションが無い 時だけ押せる
-              style={{ backgroundColor: '#ef5350', color: 'white', marginLeft: '5px' }}
-            >
-              SELL
-            </button>
-            
           </div>
         </>
       )}
 
       <hr />
-      <h2>API 接続テスト</h2>
-      <button onClick={handleCreateTransaction}>
-        ダミー取引作成 (POST)
-      </button>
+      {/* <button onClick={handleCreateTransaction}>ダミー取引作成 (POST)</button> */}
 
-      <h3>取引履歴 (GET)</h3>
+      <h3>取引履歴</h3>
       <ul>
         {transactions.length > 0 ? (
           transactions.map((tx) => (
             <li key={tx.id}>
               {tx.timestamp}: {tx.trade_type} {tx.pair} @ {tx.price} (ID: {tx.id})
+
+              {/* 損益表示 */}
+              {tx.profit !== null && (
+                <span style={{ color: tx.profit >= 0 ? 'green' : 'red', marginLeft: '10px' }}>
+                  (損益: {tx.profit.toFixed(0)} 円)
+                </span>
+              )}
+              
             </li>
           ))
         ) : (
