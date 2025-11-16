@@ -70,12 +70,28 @@ export function TradeInterface() {
       if (!chartRes.ok) throw new Error("Failed to fetch chart data");
       const data: ChartData[] = await chartRes.json();
 
+      // APIからデータが返ってこなかった場合
+      if (!data || data.length === 0) {
+        console.error("チャートデータを取得できませんでした。");
+        setFullChartData([]);
+        setDisplayChartData([]);
+        setCurrentDateIndex(0);
+        return; // isLoading(false) にするために finally に処理を移す
+      }
+
       setFullChartData(data); // 全データをここに保持
       
-      // 注意: 4000件より少ないとシミュレーションが開始しない
-      const initialDayCount = 4000; 
-      const initialData = data.slice(0, initialDayCount);
+      const totalDataLength = data.length;
+      
+      // 初期表示件数を、全データの90%か、50件の、どちらか「少ない方」にする
+      // (例: 5000件取得なら 4500件、60件取得なら 50件)
+      // ※ここではデモ用に「50件」に固定します。全データで見たい場合は `totalDataLength - 100` などにします。
+      const initialDayCount = Math.min(50, totalDataLength); 
+
+      const initialData = data.slice(0, initialDayCount); 
       setDisplayChartData(initialData);
+      
+      // 次のインデックスをセット
       setCurrentDateIndex(initialDayCount); 
 
       // 最新のレート（チャートの最後の終値）をセット
@@ -212,7 +228,6 @@ export function TradeInterface() {
   
   // 取引履歴リセットロジック
   const handleResetHistory = async () => {
-    // 念のためシミュレーションを停止
     stopSimulation();
     
     try {
@@ -221,16 +236,17 @@ export function TradeInterface() {
       });
       if (!res.ok) throw new Error("Failed to reset transactions");
 
-      // フロントエンドの状態もすべてリセット
       setTransactions([]);
       setPosition(null);
       setProfitOrLoss(0);
       setAccountBalance(INITIAL_ACCOUNT_BALANCE);
-      
-      // チャートデータを初期状態に戻す (4000件)
-      const initialData = fullChartData.slice(0, 4000);
+    
+      // fetchChartData のロジックと初期値を合わせる
+      const initialDayCount = Math.min(50, fullChartData.length);
+      const initialData = fullChartData.slice(0, initialDayCount);
+
       setDisplayChartData(initialData);
-      setCurrentDateIndex(4000);
+      setCurrentDateIndex(initialDayCount);
       if (initialData.length > 0) {
         setCurrentRate(initialData[initialData.length - 1].close);
       }
@@ -325,7 +341,12 @@ export function TradeInterface() {
         <p>チャート読込中</p>
       ) : (
         <>
-          <PriceChart data={displayChartData} />
+          {/* データが空の場合は、チャートコンポーネント自体を描画しない */}
+          {displayChartData.length > 0 ? (
+            <PriceChart data={displayChartData} />
+          ) : (
+            <p style={{ color: 'red' }}>チャートデータの取得に失敗しました。時間をおいてリロードしてください。</p>
+          )}
           
           <div>
             <h3>シミュレーション情報</h3>
