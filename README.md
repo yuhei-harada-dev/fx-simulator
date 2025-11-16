@@ -1,37 +1,45 @@
-# 現在開発中です (Work in Progress)
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FXシミュレーションアプリ (FX Simulator)
 
-## Getting Started
+Next.js + FastAPI + AWS 構成のFXデモトレード・シミュレーションアプリです。
 
-First, run the development server:
+## アプリケーションURL
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+https://fx-simulator.vercel.app/
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 機能一覧
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+* **リアルタイム・シミュレーション**: 過去の日足チャート（USD/JPY）を1日1秒で再生します。
+* **デモトレード**: 100万円の仮想残高を元に、ASK(買) / BID(売) / 全決済 が行えます。
+* **損益計算**: 保有ポジションの損益（P/L）をリアルタイムで計算・表示します。
+* **口座残高への反映**: 決済時に損益が口座残高に反映されます。
+* **取引履歴**: 全ての取引（新規・決済）をDBに記録し、損益と共に一覧表示します。
+* **リセット機能**: 口座残高や取引履歴を初期状態にリセットできます。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 使用技術とアーキテクチャ
 
-## Learn More
+* **フロントエンド**: Next.js (App Router, React 19), Vercel
+* **バックエンド**: Python, FastAPI, Uvicorn
+* **データベース**: PostgreSQL (AWS RDS)
+* **ORM / マイグレーション**: SQLAlchemy, Alembic
+* **インフラ (AWS)**: ECS (Fargate), RDS, ALB, ECR, CloudWatch
+* **コンテナ**: Docker, docker-compose
+* **CI/CD**: GitHub Actions（`main`ブランチへのプッシュでVercelとAWS ECSへ自動デプロイ）
+* **外部API**: Alpha Vantage (為替データ取得)
 
-To learn more about Next.js, take a look at the following resources:
+## 今後の機能追加予定
+### シミュレーション機能
+* **詳細な取引設定**: 取引数量（Lot）を指定できる機能。
+* **開始日時の指定**: 過去の特定の日付を指定してシミュレーションを開始する機能。
+* **リアリティの向上**: スプレッド、スワップポイント、ロスカットルールの導入。
+* **データ拡充**:
+    * 他通貨ペア（EUR/USD, GBP/JPY など）の導入。
+    * 複数時間足（月足, 週足, 4時間足, 1分足など）への対応。
+* **UI/UXの改善**:
+    * フロントエンドのUIをよりモダンなデザインに刷新。
+    * 複数チャートの同時表示機能。
+* **リアルタイム・デモトレード**: 現在の実際の為替レートを取得し、リアルタイムでのデモトレード機能を追加。
+* **自動売買（EA）**: ユーザーが定義したロジックに基づき、自動売買のバックテストを実行できるシミュレーション機能。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### パフォーマンス/インフラ
+* **動作安定化**: 外部APIから取得したチャートデータをDB（RDS）にキャッシュし、APIレートリミット（利用上限）の影響を受けない設計への変更予定。
+* **インフラ構成の見直し**: データ取得バッチなどに **AWS Lambda** やイベント駆動アーキテクチャを導入し、可能であればサーバーレス化を検討。
