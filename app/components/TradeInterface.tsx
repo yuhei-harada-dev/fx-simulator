@@ -120,7 +120,100 @@ export function TradeInterface() {
     }
   };
 
-// シミュレーション開始/停止ロジック
+  // BUYボタンが押された時の処理
+  const handleBuy = async () => {
+    // シミュレーション中でない、または既にポジションがある場合は何もしない
+    if (!isSimulating || position) return; 
+
+    const tradeAmount = 10000; // 1万通貨
+
+    const newTransactionData = {
+      pair: "USD/JPY",
+      trade_type: "buy",
+      amount: tradeAmount,
+      price: currentRate, // 現在のレートで約定
+      profit: null,
+      opening_trade_id: null
+    };
+
+    try {
+      const res = await fetch(`${API_URL}/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTransactionData),
+      });
+
+      if (!res.ok) throw new Error("Failed to create transaction");
+
+      // DBに保存成功したら、レスポンスからDB上のデータを取得
+      const savedTx: Transaction = await res.json();
+
+      // フロントエンドのPosition Stateを更新
+      setPosition({
+        trade_type: 'buy',
+        amount: savedTx.amount,
+        price: savedTx.price,
+        id: savedTx.id // DBのIDを控えておく（決済時に使うため）
+      });
+
+      // 取引履歴リストを更新
+      fetchTransactions();
+
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // SELLボタンが押された時の処理
+  const handleSell = async () => {
+    // シミュレーション中でない、または既にポジションがある場合は何もしない
+    if (!isSimulating || position) return; 
+
+    const tradeAmount = 10000;
+
+    const newTransactionData = {
+      pair: "USD/JPY",
+      trade_type: "sell",
+      amount: tradeAmount,
+      price: currentRate,
+      profit: null,
+      opening_trade_id: null
+    };
+
+    try {
+      const res = await fetch(`${API_URL}/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTransactionData),
+      });
+
+      if (!res.ok) throw new Error("Failed to create transaction");
+
+      const savedTx: Transaction = await res.json();
+
+      // フロントエンドのPosition Stateを更新
+      setPosition({
+        trade_type: 'sell',
+        amount: savedTx.amount,
+        price: savedTx.price,
+        id: savedTx.id 
+      });
+
+      // 取引履歴リストを更新
+      fetchTransactions();
+
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  ////
+
+  // シミュレーション開始/停止ロジック
   const startSimulation = () => {
     if (isSimulating || currentDateIndex >= fullChartData.length) return;
 
@@ -219,6 +312,22 @@ export function TradeInterface() {
             <button onClick={stopSimulation} disabled={!isSimulating}>
               停止
             </button>
+            
+            <button 
+              onClick={handleBuy} 
+              disabled={!isSimulating || !!position} // シミュ中 かつ ポジションが無い 時だけ押せる
+              style={{ backgroundColor: '#26a69a', color: 'white', marginLeft: '10px' }}
+            >
+              BUY
+            </button>
+            <button 
+              onClick={handleSell} 
+              disabled={!isSimulating || !!position} // シミュ中 かつ ポジションが無い 時だけ押せる
+              style={{ backgroundColor: '#ef5350', color: 'white', marginLeft: '5px' }}
+            >
+              SELL
+            </button>
+            
           </div>
         </>
       )}
