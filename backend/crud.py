@@ -1,6 +1,7 @@
 # backend/crud.py
 
 from sqlalchemy.orm import Session
+from sqlalchemy import desc # (降順)
 
 import models
 import schemas
@@ -29,5 +30,24 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate) -> m
 def get_transactions(db: Session, skip: int = 0, limit: int = 100) -> list[models.Transaction]:
     """
     DBから取引履歴を（指定された件数だけ）取得する
+    (降順でソート)
     """
-    return db.query(models.Transaction).offset(skip).limit(limit).all()
+    return (
+        db.query(models.Transaction)
+        .order_by(desc(models.Transaction.timestamp)) # 降順ソート
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+def delete_all_transactions(db: Session) -> dict:
+    """
+    すべての取引履歴を削除する
+    """
+    try:
+        num_rows_deleted = db.query(models.Transaction).delete()
+        db.commit()
+        return {"ok": True, "deleted_rows": num_rows_deleted}
+    except Exception as e:
+        db.rollback()
+        return {"ok": False, "error": str(e)}

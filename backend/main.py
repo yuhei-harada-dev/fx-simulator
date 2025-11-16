@@ -111,14 +111,23 @@ def create_new_transaction(
 @router.get("/transactions", response_model=List[schemas.Transaction])
 def read_transactions(
     skip: int = 0, 
-    limit: int = 100, 
+    limit: int = 1000, # 取得件数を増やす (またはソートを後で実装)
     db: Session = Depends(get_db)
 ):
     """
     DBから取引履歴のリストを取得するAPI
     """
     transactions = crud.get_transactions(db, skip=skip, limit=limit)
-    return transactions
+    # 最新のものが先頭に来るようにサーバーサイドでソート
+    return sorted(transactions, key=lambda tx: tx.timestamp, reverse=True)
+
+# Delete All
+@router.delete("/transactions")
+def delete_all_transactions(db: Session = Depends(get_db)):
+    """
+    すべての取引履歴をDBから削除するAPI
+    """
+    return crud.delete_all_transactions(db=db)
 
 # appにルーターを登録
 app.include_router(router)
