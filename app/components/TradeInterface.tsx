@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { PriceChart } from './PriceChart';
 
-// APIから返ってくる取引履歴の「型」
+// APIから返ってくる取引履歴の型
 interface Transaction {
   id: number;
   pair: string;
@@ -16,13 +16,21 @@ interface Transaction {
   timestamp: string; 
 }
 
-// チャートデータの「型」
+// チャートデータの型
 interface ChartData {
   time: string;
   open: number;
   high: number;
   low: number;
   close: number;
+}
+
+// ポジションの型
+interface Position {
+  trade_type: 'buy' | 'sell';
+  amount: number;
+  price: number;
+  id: number; //決済時に使う元の取引ID
 }
 
 export function TradeInterface() {
@@ -36,9 +44,14 @@ export function TradeInterface() {
   const [currentDateIndex, setCurrentDateIndex] = useState(0); // 現在のデータインデックス
   const simulationInterval = useRef<NodeJS.Timeout | null>(null); // Interval ID
 
-  // チャートデータを保持する状態
-  // const [chartData, setChartData] = useState<ChartData[]>([]);
   const [isLoading, setIsLoading] = useState(true); // ローディング状態
+
+  // 現在のレート・ポジション・損益　を管理する
+  const [currentRate, setCurrentRate] = useState<number>(0);
+  const [position, setPosition] = useState<Position | null>(null);
+  //const [position, setPosition] = useState<Position | null>({ trade_type: 'buy', amount: 10000, price: 150.00, id: 1 }) //テスト用ダミーデータ
+  const [profitOrLoss, setProfitOrLoss] = useState<number>(0);
+
 
   // バックエンドAPIのURL
   const API_URL = "/api/proxy";
@@ -55,6 +68,11 @@ export function TradeInterface() {
       const initialData = data.slice(0, 4000); // 最初は例えば4000日分だけ表示する
       setDisplayChartData(initialData);
       setCurrentDateIndex(4000); // 次は4000番目から開始
+
+      // 最新のレート（チャートの最後の終値）をセット
+      if (initialData.length > 0) {
+        setCurrentRate(initialData[initialData.length - 1].close);
+      }
 
     } catch (error) {
       console.error(error);
@@ -110,17 +128,23 @@ export function TradeInterface() {
 
     simulationInterval.current = setInterval(() => {
       setCurrentDateIndex((prevIndex) => {
+
         const nextIndex = prevIndex + 1;
         if (nextIndex >= fullChartData.length) {
           stopSimulation(); // データが終わったら停止
           return prevIndex;
         }
 
-        // 描画用データに次の1日分を追加
-        setDisplayChartData(fullChartData.slice(0, nextIndex));
+        // currentRateを1秒ごとに更新する処理
+        const nextDataPoint = fullChartData[prevIndex]; // これから追加するデータ
+        if (nextDataPoint) {
+          setDisplayChartData(fullChartData.slice(0, nextIndex));
+          setCurrentRate(nextDataPoint.close); // レートを更新
+        }
+
         return nextIndex;
       });
-    }, 200); // 0.2秒ごとに更新
+    }, 1000); // 1秒ごとに更新
   };
 
   const stopSimulation = () => {
@@ -142,6 +166,29 @@ export function TradeInterface() {
     fetchTransactions();
   }, []); // 空の配列は1回だけ実行を意味する
 
+  // currentRate か position が変更されるたびに、損益を自動計算する
+  useEffect(() => {
+    if (!position) {
+      setProfitOrLoss(0);
+      return;
+    }
+
+    let pips = 0;
+    if (position.trade_type === 'buy') {
+      // (現在のレート - エントリーレート)
+      pips = currentRate - position.price;
+    } else {
+      // (エントリーレート - 現在のレート)
+      pips = position.price - currentRate;
+    }
+
+    // 1万通貨の場合 (USD/JPYは 1pips = 100円)
+    const calculatedProfit = pips * position.amount; 
+
+    setProfitOrLoss(calculatedProfit);
+
+  }, [currentRate, position]); // currentRate か position が変わるたびに実行
+
   return (
     <div>
 
@@ -151,6 +198,20 @@ export function TradeInterface() {
       ) : (
         <>
           <PriceChart data={displayChartData} />
+
+          <div>
+            <h3>シミュレーション情報</h3>
+            <p>現在のレート: {currentRate.toFixed(3)}</p>
+            {position ? (
+              <div>
+                <p>ポジション: {position.trade_type} @ {position.price}</p>
+                <p>損益: {profitOrLoss.toFixed(0)} 円</p>
+              </div>
+            ) : (
+              <p>ポジション: なし</p>
+            )}
+          </div>
+
           <div>
             <button onClick={startSimulation} disabled={isSimulating}>
               シミュレーション開始
